@@ -1,0 +1,48 @@
+data:
+  raw_path: data/raw/lending_club.csv
+  processed_path: data/processed/lending_club_fe.parquet
+  id_column: id
+  date_column: issue_d
+  target_column: default_90d
+  feature_columns: null
+  categorical_columns:
+    - purpose
+    - home_ownership
+    - verification_status
+
+split:
+  policy: temporal_purged
+  test_fraction: 0.20
+  purge_days: 90
+  n_splits_cv: 5
+
+features:
+  derived:
+    - dti
+    - income_to_loan
+    - utilization
+    - derog_markers
+    - inq_last_6m
+
+model:
+  seed: 42
+  baseline_logistic:
+    C: 1.0
+    max_iter: 1000
+  lightgbm_monotone:
+    n_estimators: 1000
+    learning_rate: 0.05
+    num_leaves: 31
+    monotone_constraints: null
+    early_stopping_rounds: 50
+
+evaluation:
+  metrics:
+    - roc_auc
+    - pr_auc
+    - brier
+    - ks
+  probability_calibration: isotonic
+
+outputs:
+  results_dir: results

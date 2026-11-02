@@ -1,0 +1,33 @@
+# Data
+data/raw/*
+data/processed/*
+!data/raw/.gitkeep
+!data/processed/.gitkeep
+
+# Artifacts
+results/*
+!results/.gitkeep
+mlruns/
+wandb/
+.dvc/
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+.ipynb_checkpoints/
+
+# Secrets & keys
+.env
+*.key
+configs/credentials.yaml
+configs/credentials.json
+
+# OS
+.DS_Store
+
+# Local Databases
+*.sqlite3
+

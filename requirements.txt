@@ -1,0 +1,50 @@
+# Core data science
+numpy>=1.26
+pandas>=2.2
+polars>=1.0
+scikit-learn>=1.5
+scipy>=1.13
+
+# Models
+xgboost>=2.1
+lightgbm>=4.4
+
+# Stats / econometrics / time series
+statsmodels>=0.14
+pmdarima>=2.0
+
+# XAI + uncertainty
+shap>=0.46
+mapie>=0.9
+
+# Backend (Django)
+django>=5.0
+django-ninja>=1.0
+django-cors-headers>=4.3
+celery>=5.3
+redis>=5.0
+psycopg2-binary>=2.9
+
+# Database
+pgvector>=0.3
+
+# Data access
+world-bank>=1.0.5
+fredapi>=0.5.2
+imfp>=0.2
+pytrends>=4.9
+
+# AI agent (free local models)
+ollama>=0.3
+sentence-transformers>=3.0
+
+# Visualization / notebooks
+plotly>=5.22
+
+# Experiment tracking & data versioning
+mlflow>=2.13
+pyyaml>=6.0
+dvc>=3.0
+
+# PDF report generation
+weasyprint>=60
