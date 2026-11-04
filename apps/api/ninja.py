@@ -304,3 +304,48 @@ def allocate_personal_wealth(request, payload: HouseholdInputSchema):
             "Deploy 25% into bulk purchases of non-perishable pantry and household essentials before tariff increases."
         ]
     )
+
+
+# ============================================================================
+# NOWCASTING & FORECASTING ENDPOINTS (Module 2)
+# ============================================================================
+
+@api.get("/nowcast/{country_iso3}", tags=["Nowcasting (Module 2)"])
+def get_nowcast(request, country_iso3: str, target: str = "gdp"):
+    """
+    Returns next-year prediction with 90% conformal uncertainty range for a country.
+    Calculated deterministically by the validated LightGBM + MAPIE model.
+    """
+    from src.nowcasting.inference import get_country_forecast, get_shap_explanation
+    fc = get_country_forecast(country_iso3, target)
+    if not fc:
+        return {"error": f"No forecast available for country {country_iso3}. Run model training first."}
+    
+    explanation = get_shap_explanation(country_iso3, target)
+    return {
+        "country": country_iso3.upper(),
+        "target": target.upper(),
+        "forecast": fc["forecast"],
+        "unit": "%",
+        "uncertainty_interval_90pct": {
+            "lower": fc["lower_90"],
+            "upper": fc["upper_90"]
+        },
+        "forecast_year": fc["year"] + 1,
+        "base_year": fc["year"],
+        "top_drivers": explanation.get("top_drivers", []) if explanation else []
+    }
+
+
+@api.get("/nowcast/model-card/{target}", tags=["Nowcasting (Module 2)"])
+def get_model_performance(request, target: str):
+    """
+    Returns transparent audit card for the nowcasting model:
+    evaluates LightGBM against the Ridge baseline with 90% conformal coverage.
+    """
+    from src.nowcasting.inference import get_model_card
+    card = get_model_card(target)
+    if not card:
+        return {"error": f"No model card available for target {target}."}
+    return card
+
