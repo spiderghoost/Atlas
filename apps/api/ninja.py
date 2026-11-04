@@ -349,3 +349,44 @@ def get_model_performance(request, target: str):
         return {"error": f"No model card available for target {target}."}
     return card
 
+
+# ============================================================================
+# CRISIS EARLY WARNING SYSTEM (Module 1)
+# ============================================================================
+
+@api.get("/crisis-early-warning/{country_iso3}", tags=["Crisis Early Warning (Module 1)"])
+def get_crisis_risk(request, country_iso3: str):
+    """
+    Returns next 1-2 year systemic crisis probability, risk tier (Low/Moderate/High),
+    and SHAP-computed leading vulnerability drivers (IMF Laeven & Valencia ground truth).
+    """
+    from src.early_warning.inference import get_country_crisis_risk
+    risk = get_country_crisis_risk(country_iso3, "1y")
+    if not risk:
+        return {"error": f"No early warning risk score available for {country_iso3}."}
+    return risk
+
+
+@api.get("/crisis-early-warning/rankings/global", tags=["Crisis Early Warning (Module 1)"])
+def get_crisis_rankings(request, limit: int = 25):
+    """
+    Returns global crisis risk rankings for the Global Risk Map,
+    identifying countries with the highest systemic distress vulnerability.
+    """
+    from src.early_warning.inference import get_global_risk_rankings
+    return get_global_risk_rankings("1y", limit=limit)
+
+
+@api.get("/crisis-early-warning/audit/model-card", tags=["Crisis Early Warning (Module 1)"])
+def get_early_warning_audit(request):
+    """
+    Returns institutional model audit card benchmarking XGBoost against the
+    IMF Logistic Regression baseline with ROC-AUC, PR-AUC, and Brier scores.
+    """
+    from src.early_warning.inference import get_early_warning_model_card
+    card = get_early_warning_model_card("1y")
+    if not card:
+        return {"error": "Early warning model card not found."}
+    return card
+
+
