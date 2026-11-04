@@ -37,14 +37,19 @@ def get_country_crisis_risk(country_iso3: str, horizon: str = "1y") -> Optional[
     latest = country_records[0]
     explanation = get_crisis_shap_explanation(country_iso3, horizon)
 
+    base_year = latest.get("base_data_year", latest.get("year", 2024))
+    fc_year = latest.get("forecast_year", base_year + 1)
+    fc_window = latest.get("forecast_window", f"{fc_year} - 2026")
+
     return {
         "country": country_iso3.upper(),
-        "horizon": "1-Year Forward Window",
+        "horizon": "1-2 Year Forward Window",
         "crisis_probability": latest["crisis_probability"],
         "crisis_probability_pct": latest["crisis_probability_pct"],
         "risk_tier": latest["risk_tier"], # Low, Moderate, High
-        "evaluation_year": latest["year"],
-        "forecast_window": f"{latest['year'] + 1}",
+        "base_data_year": base_year,
+        "forecast_year": fc_year,
+        "forecast_window": fc_window,
         "top_vulnerability_drivers": explanation.get("drivers", []) if explanation else [],
     }
 
@@ -140,11 +145,30 @@ def get_global_risk_rankings(horizon: str = "1y", limit: int = 50) -> List[Dict[
     with open(preds_file) as f:
         preds = json.load(f)
 
-    # Get latest year available across countries
-    max_yr = max(r["year"] for r in preds)
-    latest_all = [r for r in preds if r["year"] == max_yr]
-    ranked = sorted(latest_all, key=lambda x: x["crisis_probability"], reverse=True)
+    # For each country, select its latest observation (e.g. 2024 or 2023)
+    country_latest = {}
+    for r in preds:
+        cid = r["country"]
+        yr = r.get("base_data_year", r.get("year", 0))
+        if cid not in country_latest or yr > country_latest[cid].get("base_data_year", country_latest[cid].get("year", 0)):
+            country_latest[cid] = r
 
+    formatted_rankings = []
+    for r in country_latest.values():
+        base_yr = r.get("base_data_year", r.get("year", 2024))
+        fc_yr = r.get("forecast_year", base_yr + 1)
+        fc_win = r.get("forecast_window", f"{fc_yr} - 2026")
+        formatted_rankings.append({
+            "country": r["country"],
+            "base_data_year": base_yr,
+            "forecast_year": fc_yr,
+            "forecast_window": fc_win,
+            "crisis_probability": r["crisis_probability"],
+            "crisis_probability_pct": r["crisis_probability_pct"],
+            "risk_tier": r["risk_tier"],
+        })
+
+    ranked = sorted(formatted_rankings, key=lambda x: x["crisis_probability"], reverse=True)
     return ranked[:limit]
 
 

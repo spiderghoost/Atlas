@@ -19,6 +19,7 @@ import mlflow
 import mlflow.sklearn
 import mlflow.xgboost
 import shap
+import joblib
 from pathlib import Path
 
 from sklearn.linear_model import LogisticRegression
@@ -192,22 +193,39 @@ def train_early_warning_system(horizon: str = "1y") -> dict:
         bar = "#" * int(val * 15)
         print(f"    {feat:25s}  {val:.4f}  {bar}")
 
-    # ── 6. GENERATE COUNTRY RISK PROFILES (Latest Year) ─────────────────────────
-    test_df = X[X["year"] >= TEST_START_YEAR].copy()
-    test_df_imp = imputer.transform(test_df[feature_names])
-    test_probs = xgb_model.predict_proba(test_df_imp)[:, 1]
+    # ── 6. GENERATE COUNTRY RISK PROFILES & FORWARD PROJECTIONS ────────────────
+    from src.early_warning.data_builder import load_early_warning_panel, engineer_early_warning_features
+    full_panel = load_early_warning_panel()
+    full_panel = engineer_early_warning_features(full_panel)
+
+    recent_panel = full_panel[full_panel["year"] >= TEST_START_YEAR].copy()
+    recent_panel_imp = imputer.transform(recent_panel[feature_names])
+    probs_all = xgb_model.predict_proba(recent_panel_imp)[:, 1]
 
     country_risk_scores = []
-    for i, (_, row) in enumerate(test_df.iterrows()):
-        p = float(test_probs[i])
+    for i, (_, row) in enumerate(recent_panel.iterrows()):
+        p = float(probs_all[i])
         tier = "High" if p >= 0.35 else ("Moderate" if p >= 0.15 else "Low")
+        base_yr = int(row["year"])
+        fc_yr = base_yr + 1
         country_risk_scores.append({
             "country": row["country_id"],
-            "year": int(row["year"]),
+            "year": base_yr,
+            "base_data_year": base_yr,
+            "forecast_year": fc_yr,
+            "forecast_window": f"{fc_yr} - {max(fc_yr, 2026)}",
             "crisis_probability": round(p, 4),
             "crisis_probability_pct": round(p * 100, 1),
             "risk_tier": tier,
         })
+
+    # Save trained model artifact for online inference
+    model_artifact = {
+        "model": xgb_model,
+        "imputer": imputer,
+        "features": feature_names,
+    }
+    joblib.dump(model_artifact, RESULTS_DIR / f"early_warning_{horizon}_model.joblib")
 
     # Save to disk
     out_results = RESULTS_DIR / f"early_warning_{horizon}_results.json"
@@ -219,13 +237,15 @@ def train_early_warning_system(horizon: str = "1y") -> dict:
         json.dump(country_risk_scores, f, indent=2)
 
     print(f"\n  Results saved -> {out_results}")
+    print(f"  Model artifact saved -> {RESULTS_DIR / f'early_warning_{horizon}_model.joblib'}")
     print(f"  Country risk scores saved -> {out_preds} ({len(country_risk_scores)} total predictions)")
 
-    # Print a sample of recent country risks
-    recent_risks = [c for c in country_risk_scores if c["year"] == 2023][:8]
-    print("\n  Sample 2023 Risk Scores (Out-of-sample Test):")
-    for r in recent_risks:
-        print(f"    {r['country']} ({r['year']}): {r['crisis_probability_pct']:5.1f}% risk  [{r['risk_tier']:8s}]")
+    # Print a sample of latest forward projections
+    max_year = max(c["base_data_year"] for c in country_risk_scores)
+    latest_risks = [c for c in country_risk_scores if c["base_data_year"] == max_year][:8]
+    print(f"\n  Sample Forward Projections (Base Data: {max_year} -> Forecast: {max_year + 1}-2026):")
+    for r in latest_risks:
+        print(f"    {r['country']} (Data: {r['base_data_year']} -> Forecast {r['forecast_window']}): {r['crisis_probability_pct']:5.1f}% risk  [{r['risk_tier']:8s}]")
 
     return results
 
